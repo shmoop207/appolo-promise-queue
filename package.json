@@ -1,0 +1,48 @@
+{
+  "name": "appolo-promise-queue",
+  "description": "promise queue",
+  "keywords": [
+    "promise",
+    "queue",
+    "pool",
+    "concurrency"
+  ],
+  "author": {
+    "name": "Roman Svichar",
+    "email": "shmoop207@gmail.com"
+  },
+  "engines": {
+    "node": ">= 12.x.x",
+    "npm": ">= 6.x.x"
+  },
+  "scripts": {
+    "test": "mocha test --exit"
+  },
+  "main": "./index.js",
+  "version": "1.0.4",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shmoop207/appolo-promise-queue.git"
+  },
+  "readme": "",
+  "readmeFilename": "README.md",
+  "dependencies": {
+    "appolo-event-dispatcher": "^7.0.1",
+    "appolo-utils": "^0.0.50"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.2.11",
+    "@types/mocha": "^7.0.2",
+    "@types/node": "^13.9.5",
+    "@types/sinon": "^7.5.2",
+    "@types/sinon-chai": "^3.2.3",
+    "bluebird": "^3.7.2",
+    "chai": "^4.2.0",
+    "mocha": "^7.1.1",
+    "sinon": "^9.0.1",
+    "sinon-chai": "^3.5.0",
+    "tslib": "^1.11.1",
+    "typescript": "^3.8.3"
+  }
+}
