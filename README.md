@@ -31,40 +31,47 @@ let [result,result2] = await Promise.all([promise1,promise2])
 - `concurrency` - max concurrent running promises default `1`
 - `timeout` - max wait time for promise to settle on the promise wil be rejected default `null`
 - `autoStart` - start running promises as the added default `true`
+- `expire` - max time the job can wait in the queue is when passed the job will be removed without execution of the promise
+- `timespan` - time frame in milliseconds of concurrency jobs
 
 ```javascript
 
 const queue = new Queue({
-    concurrency:2, 
+    concurrency: 2, 
     timeout: 1000,
-    autoStart :false
+    autoStart: false,
+    timespan:60000
 });
 
 ```
 
-#### Add
-add promise to queue with given Promise-returning/async function
+#### add(fn,[options])
+add job to queue with given Promise-returning/async function
 ##### options:
-- timeout - override queue timeout for this promise
-- priority - promise priority in the queue greater priority will be scheduled first
+- `timeout` - override queue timeout for this job.
+- `priority` - job priority in the queue greater priority will be scheduled first.
+- `expire` - max time the job can wait in the queue before it removed.
 
 returns promise when the origin promise settled; 
+
 ```javascript
 const queue = new Queue();
 
-await queue.add(async ()=>await "something",{timeout:1000,priority:100})
+await queue.add(async ()=>await "something",{timeout:1000,priority:100});
+
+await queue.add(()=>Promise.resolve(),{expire:60000});
+
 ```
 
-
-#### start
+#### start()
 Start (or resume) executing enqueued promises
-#### stop
+#### stop()
 stop queue execution
 
-#### onDrain
+#### onDrain()
 Returns a promise that settles when the queue becomes empty
 
-#### onIdle
+#### onIdle()
 Returns a promise that settles when the queue becomes empty, and all promises have completed
 ```javascript
 
@@ -74,7 +81,7 @@ const queue = new Queue();
  
  await queue.onIdle();
 ```
-#### clear
+#### clear()
 clear the queue
 
 #### size
@@ -94,6 +101,12 @@ return true if queue is empty
 
 #### isIdle
 return true if queue is empty and no running promises
+
+#### has(fn)
+return true if given fn exists in queue;
+
+#### remove(fn)
+removes given fn from queue
 
 ### Events
 

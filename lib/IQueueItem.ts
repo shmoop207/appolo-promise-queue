@@ -4,4 +4,6 @@ export interface IQueueItem<T> {
     reject: (reason?: any) => any,
     priority: number,
     timeout: number
+    expire: number
+    insertTime: number
 }

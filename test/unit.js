@@ -104,6 +104,64 @@ describe("Promise Queue", function () {
         await queue.onIdle();
         result.should.be.deep.equal([0]);
     });
+    it('should run queue with expire', async () => {
+        const result = [];
+        const queue = new index_1.Queue({ concurrency: 1 });
+        queue.add(async () => {
+            await appolo_utils_1.Promises.delay(20);
+            result.push(0);
+        });
+        queue.add(async () => {
+            await appolo_utils_1.Promises.delay(5);
+            result.push(1);
+        }, { expire: 19 });
+        await queue.onIdle();
+        result.should.be.deep.equal([0]);
+    });
+    it('should remove from queue', async () => {
+        const queue = new index_1.Queue({ concurrency: 1, timespan: 100, autoStart: false });
+        let fn = () => Promise.resolve();
+        queue.add(fn);
+        queue.has(fn).should.be.ok;
+        queue.remove(fn);
+        queue.has(fn).should.be.not.ok;
+        queue.size.should.be.eq(0);
+    });
+    it('should run queue with timespan', async () => {
+        const result = [];
+        const queue = new index_1.Queue({ concurrency: 1, timespan: 100 });
+        let time = Date.now();
+        queue.add(async () => {
+            result.push(0);
+        });
+        queue.add(async () => {
+            result.push(1);
+        });
+        await queue.onIdle();
+        (Date.now() - time).should.be.within(100, 110);
+    });
+    it('should run queue with timespan and concurrency', async () => {
+        const result = [];
+        const queue = new index_1.Queue({ concurrency: 2, timespan: 100 });
+        let time = Date.now();
+        queue.add(async () => {
+            result.push(0);
+        });
+        queue.add(async () => {
+            result.push(1);
+        });
+        queue.add(async () => {
+            result.push(1);
+        });
+        queue.add(async () => {
+            result.push(1);
+        });
+        queue.add(async () => {
+            result.push(1);
+        });
+        await queue.onIdle();
+        (Date.now() - time).should.be.within(200, 220);
+    });
     it('should run queue with onDrain', async () => {
         const queue = new index_1.Queue({ concurrency: 1 });
         queue.add(async () => 0);

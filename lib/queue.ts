@@ -6,7 +6,7 @@ import {Event, IEvent} from "appolo-event-dispatcher";
 
 export class Queue<T> {
 
-    private _promises: IQueueItem<T>[] = [];
+    private _items: IQueueItem<T>[] = [];
     private _pending: IQueueItem<T>[] = [];
 
     private _onDrainEvent = new Event<void>();
@@ -17,12 +17,10 @@ export class Queue<T> {
     private _options: IOptions;
 
     private _isRunning: boolean;
+    private _timeSpanWindow: number;
 
-    // private _drainPromise: Promise<void>;
-    // private _drainResolve: Function;
-    //
-    // private _idlePromise: Promise<void>;
-    // private _idleResolve: Function;
+    private _lastDequeueTime: number = 0;
+    private _dequeueInterval: NodeJS.Timeout;
 
     constructor(options?: IOptions) {
         this._options = Objects.defaults({}, options || {}, OptionsDefaults);
@@ -30,6 +28,8 @@ export class Queue<T> {
         if (this._options.autoStart) {
             this.start();
         }
+
+        this._setTimeSpanWindow();
     }
 
     public start() {
@@ -42,19 +42,23 @@ export class Queue<T> {
     }
 
     public get size() {
-        return this._promises.length
+        return this._items.length
     }
 
     public get pending() {
         return this._pending.length
     }
 
-    public get isDrained() {
-        return this._promises.length == 0
+    public get isDrained(): boolean {
+        return this._items.length == 0
     }
 
-    public get isIdle() {
-        return this._promises.length == 0 && this._pending.length == 0
+    public get isIdle(): boolean {
+        return this._items.length == 0 && this._pending.length == 0
+    }
+
+    public get canExecute(): boolean {
+        return this._pending.length < this._options.concurrency
     }
 
     public get isRunning() {
@@ -67,11 +71,25 @@ export class Queue<T> {
     }
 
     public set concurrency(value: number) {
-        this._options.concurrency = value
+        this._options.concurrency = value;
+        this._setTimeSpanWindow();
+    }
+
+    public get timespan() {
+        return this._options.timespan;
+    }
+
+    public set timespan(value: number) {
+        this._options.timespan = value;
+        this._setTimeSpanWindow();
+    }
+
+    private _setTimeSpanWindow() {
+        this._options.timespan && (this._timeSpanWindow = this._options.timespan / this._options.concurrency);
     }
 
     public clear() {
-        this._promises.length = 0;
+        this._items.length = 0;
     }
 
     public get onDrainEvent(): IEvent<void> {
@@ -99,15 +117,26 @@ export class Queue<T> {
         return this._onIdleEvent.once() as Promise<void>
     }
 
-    public add(fn: () => Promise<T>, options: { priority?: number, timeout?: number } = {}) {
+    public remove(fn: () => Promise<T>): void {
+        Arrays.removeBy(this._items, item => item.fn === fn);
+    }
+
+    public has(fn: () => Promise<T>): boolean {
+        return !!this._items.find(item => item.fn === fn)
+    }
+
+
+    public add(fn: () => Promise<T>, options: { priority?: number, timeout?: number, expire?: number } = {}) {
         return new Promise((resolve, reject) => {
-            this._promises.push({
+            this._items.push({
                 fn, reject, resolve,
                 priority: options.priority || 0,
-                timeout: options.timeout || this._options.timeout || 0
+                timeout: options.timeout || this._options.timeout || 0,
+                expire: options.expire || this._options.expire || 0,
+                insertTime: Date.now()
             });
 
-            this._promises.sort((a, b) => b.priority - a.priority);
+            this._items.sort((a, b) => b.priority - a.priority);
             this._dequeue();
         })
     }
@@ -118,16 +147,48 @@ export class Queue<T> {
     }
 
     private _dequeue() {
+
         this._checkEvents();
-        if (!this._isRunning || !this._promises.length || this._pending.length >= this._options.concurrency) {
+
+        if (!this.isRunning || this.isDrained || !this.canExecute || !this._isValidTimespan()) {
             return;
         }
 
-        let item = this._promises.shift();
+        this._dequeueItem();
+
+        this._dequeue();
+    }
+
+    private _isValidTimespan(): boolean {
+        if (!this._options.timespan) {
+            return true
+        }
+
+        let offset = Date.now() - this._lastDequeueTime - this._timeSpanWindow;
+
+        if (offset >= 0) {
+            return true
+        }
+
+        clearTimeout(this._dequeueInterval);
+
+        this._dequeueInterval = setTimeout(() => this._dequeue(), Math.abs(offset));
+
+        return false;
+    }
+
+    private _dequeueItem() {
+        let item = this._items.shift();
+
+        if (item.expire && item.expire + item.insertTime < Date.now()) {
+            return;
+        }
 
         let promise = item.timeout ? Promises.promiseTimeout(item.fn(), item.timeout) : item.fn();
 
         this._pending.push(item);
+
+        this._lastDequeueTime = Date.now();
 
         this._onDequeueEvent.fireEvent();
 
@@ -141,12 +202,6 @@ export class Queue<T> {
                 Arrays.remove(this._pending, item);
                 item.reject(e)
             })
-            .finally(() => {
-                this._dequeue();
-            });
-
-        this._dequeue();
+            .finally(() => this._dequeue());
     }
-
-
 }
